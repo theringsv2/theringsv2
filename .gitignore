@@ -1,0 +1,7 @@
+__pycache__/
+*.egg-info/
+.venv/
+data/
+secrets/
+khc_docs.toml
+.pytest_cache/

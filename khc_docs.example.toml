@@ -1,0 +1,29 @@
+# Sao chép thành khc_docs.toml rồi chỉnh. Đường dẫn tương đối tính từ thư mục chứa file này.
+
+[index]
+db = "data/khc_docs.db"        # chỉ mục SQLite (một file, sao lưu được)
+cache_dir = "data/cache"       # nơi lưu file tải từ Drive
+keep_cache = true              # false = xoá file tải về sau khi trích xuất
+workers = 3                    # số tiến trình trích xuất/OCR song song
+
+[google]
+# OAuth Desktop client (tài khoản cá nhân) HOẶC service account JSON (phải share thư mục cho email SA)
+credentials = "secrets/credentials.json"
+token = "secrets/token.json"
+
+[extract]
+ocr = true
+ocr_lang = "vie+eng"
+ocr_dpi = 300
+min_text_chars = 40            # trang PDF có ít ký tự hơn -> coi là scan và OCR
+max_ocr_pages = 300            # giới hạn OCR mỗi file
+xlsx_rows_per_block = 40
+
+[[projects]]
+code = "NAMHA"
+name = "Nam Hà"
+drive_folder_id = "1gIygpVT9zbsBiLxOXB0XQO_B76Wq7acQ"   # thư mục NAM HÀ (01-HỒ SƠ THẦU … 18-NGÂN SÁCH)
+# local_path = "G:/My Drive/.../NAM HÀ"                 # dùng thay Drive API nếu đã đồng bộ Drive for Desktop
+exclude_paths = ["11-HÌNH ẢNH THI CÔNG"]                # ảnh hiện trường: OCR không có giá trị tra cứu
+max_file_mb = 200
+ocr_images = true
