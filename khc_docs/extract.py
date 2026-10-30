@@ -223,57 +223,94 @@ def _cell_str(v) -> str:
     return clean(str(v)).replace("\n", " ")
 
 
+def _sheet_segments(title: str, rows, opt: ExtractOptions, res: ExtractResult):
+    """rows: iterable các tuple giá trị ô theo thứ tự dòng (dòng 1 = phần tử đầu)."""
+    from openpyxl.utils import get_column_letter
+
+    header: str | None = None
+    block: list[str] = []
+    start_row = None
+    last_row = 0
+    max_col = 1
+    n = 0
+
+    def flush():
+        rng = f"A{start_row}:{get_column_letter(max_col)}{last_row}"
+        body = "\n".join(block)
+        if header and not body.startswith(header):
+            body = f"[Tiêu đề] {header}\n{body}"
+        res.segments.append(Segment(body, f"sheet '{title}'!{rng}", {"sheet": title, "range": rng}))
+
+    for r_idx, row in enumerate(rows, start=1):
+        if n >= opt.xlsx_max_rows:
+            res.warnings.append(f"sheet '{title}': cắt ở {opt.xlsx_max_rows} dòng")
+            break
+        vals = [_cell_str(v) for v in row]
+        while vals and not vals[-1]:
+            vals.pop()
+        if not any(vals):
+            continue
+        n += 1
+        max_col = max(max_col, len(vals))
+        line = f"R{r_idx}: " + " | ".join(vals)
+        # dòng tiêu đề bảng: dòng đầu tiên có >= 3 ô chữ
+        if header is None and sum(1 for v in vals if v and not v.replace(",", "").replace(".", "").isdigit()) >= 3:
+            header = line
+        if start_row is None:
+            start_row = r_idx
+        block.append(line)
+        last_row = r_idx
+        if len(block) >= opt.xlsx_rows_per_block:
+            flush()
+            block, start_row = [], None
+    if block:
+        flush()
+    res.pages += 1
+
+
 def _extract_xlsx(path: Path, opt: ExtractOptions) -> ExtractResult:
     import openpyxl
-    from openpyxl.utils import get_column_letter
 
     res = ExtractResult(segments=[])
     wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
     for ws in wb.worksheets:
         if getattr(ws, "sheet_state", "visible") != "visible":
             res.warnings.append(f"sheet ẩn '{ws.title}' vẫn được lập chỉ mục")
-        header: str | None = None
-        block: list[str] = []
-        start_row = None
-        last_row = 0
-        max_col = 1
-        n = 0
-        for r_idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
-            if n >= opt.xlsx_max_rows:
-                res.warnings.append(f"sheet '{ws.title}': cắt ở {opt.xlsx_max_rows} dòng")
-                break
-            vals = [_cell_str(v) for v in row]
-            while vals and not vals[-1]:
-                vals.pop()
-            if not any(vals):
-                continue
-            n += 1
-            max_col = max(max_col, len(vals))
-            line = f"R{r_idx}: " + " | ".join(vals)
-            # dòng tiêu đề bảng: dòng đầu tiên có >= 3 ô chữ
-            if header is None and sum(1 for v in vals if v and not v.replace(",", "").replace(".", "").isdigit()) >= 3:
-                header = line
-            if start_row is None:
-                start_row = r_idx
-            block.append(line)
-            last_row = r_idx
-            if len(block) >= opt.xlsx_rows_per_block:
-                rng = f"A{start_row}:{get_column_letter(max_col)}{last_row}"
-                body = "\n".join(block)
-                if header and not body.startswith(header):
-                    body = f"[Tiêu đề] {header}\n{body}"
-                res.segments.append(Segment(body, f"sheet '{ws.title}'!{rng}",
-                                            {"sheet": ws.title, "range": rng}))
-                block, start_row = [], None
-        if block:
-            rng = f"A{start_row}:{get_column_letter(max_col)}{last_row}"
-            body = "\n".join(block)
-            if header and not body.startswith(header):
-                body = f"[Tiêu đề] {header}\n{body}"
-            res.segments.append(Segment(body, f"sheet '{ws.title}'!{rng}",
-                                        {"sheet": ws.title, "range": rng}))
-        res.pages += 1
+        _sheet_segments(ws.title, ws.iter_rows(values_only=True), opt, res)
     wb.close()
+    return res
+
+
+def _extract_xls(path: Path, opt: ExtractOptions) -> ExtractResult:
+    """Excel 97-2003 (.xls) đọc trực tiếp bằng xlrd, không cần LibreOffice."""
+    import datetime
+
+    import xlrd
+
+    res = ExtractResult(segments=[])
+    wb = xlrd.open_workbook(str(path), on_demand=True)
+    for sh in wb.sheets():
+        if sh.visibility:
+            res.warnings.append(f"sheet ẩn '{sh.name}' vẫn được lập chỉ mục")
+
+        def rows(sh=sh):
+            for r in range(sh.nrows):
+                out = []
+                for c in sh.row(r):
+                    if c.ctype == xlrd.XL_CELL_DATE:
+                        try:
+                            out.append(datetime.datetime(*xlrd.xldate_as_tuple(c.value, wb.datemode)))
+                        except (ValueError, xlrd.xldate.XLDateError):
+                            out.append(c.value)
+                    elif c.ctype in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK, xlrd.XL_CELL_ERROR):
+                        out.append(None)
+                    else:
+                        out.append(c.value)
+                yield out
+
+        _sheet_segments(sh.name, rows(), opt, res)
+        wb.unload_sheet(sh.name)
+    wb.release_resources()
     return res
 
 
@@ -352,7 +389,8 @@ _HANDLERS = {
     ".xlsx": _extract_xlsx, ".xlsm": _extract_xlsx,
     ".pptx": _extract_pptx,
     ".txt": _extract_text, ".csv": _extract_text, ".md": _extract_text,
-    ".doc": _convert_legacy, ".xls": _convert_legacy, ".ppt": _convert_legacy,
+    ".xls": _extract_xls,
+    ".doc": _convert_legacy, ".ppt": _convert_legacy,
     **{e: _extract_image for e in IMAGE_EXT},
 }
 

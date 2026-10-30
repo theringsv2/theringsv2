@@ -79,6 +79,7 @@ def sync_project(cfg: Config, prj: Project, *, limit: int | None = None, force: 
             reason = _skip_reason(rf, prj)
             if dry_run:
                 progress(f"{'SKIP' if reason else 'OK  '} {rf.path}/{rf.name}" + (f"  ({reason})" if reason else ""))
+                rep.skipped += bool(reason)
                 continue
             doc_id, changed = idx.upsert_document(
                 project=prj.code, source_id=rf.source_id, name=rf.name, path=rf.path, ext=rf.ext, mime=rf.mime,

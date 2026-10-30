@@ -173,3 +173,16 @@ def test_mcp_tools(project, monkeypatch):
     assert [c["cite"].split(", ")[-1] for c in ctx["chunks"]] == ["tr.1", "tr.2"]
     outline = json.loads(m.document_outline(res[0]["doc_id"]))
     assert outline["pages"] == 2
+
+
+def test_xls_legacy(tmp_path):
+    xlwt = pytest.importorskip("xlwt")
+    wb = xlwt.Workbook()
+    ws = wb.add_sheet("NGÂN SÁCH")
+    for c, v in enumerate(["Mã", "Nội dung", "Giá trị"]):
+        ws.write(0, c, v)
+    ws.write(1, 0, "NS.01"); ws.write(1, 1, "Chi phí nhân công"); ws.write(1, 2, 1234567.5)
+    wb.save(str(tmp_path / "ns.xls"))
+    seg = extract(tmp_path / "ns.xls").segments[0]
+    assert seg.label == "sheet 'NGÂN SÁCH'!A1:C2"
+    assert "R2: NS.01 | Chi phí nhân công | 1,234,567.5" in seg.text
