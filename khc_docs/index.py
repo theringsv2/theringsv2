@@ -13,7 +13,7 @@ import json
 import re
 import sqlite3
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .extract import ExtractResult, Segment
@@ -84,7 +84,8 @@ class Hit:
     snippet: str
     score: float
     tokens: int
-    also_at: list[str]
+    also_at: list[str]                      # bản sao y hệt (cùng md5)
+    similar: list[str] = field(default_factory=list)  # bản gần giống (bản nháp/FINAL/SUBMIT…) bị gộp khỏi kết quả
 
     def citation(self) -> str:
         loc = f", {self.label}" if self.label else ""
@@ -250,12 +251,22 @@ class Index:
             scored.append((r["score"] - bonus, r))
         scored.sort(key=lambda x: x[0])
         seen_content: dict[int, int] = {}
+        shingles: list[set] = []
         for s, r in scored:
             # tối đa 3 đoạn / tài liệu để kết quả đa dạng
             if seen_content.get(r["content_id"], 0) >= 3:
                 continue
-            seen_content[r["content_id"]] = seen_content.get(r["content_id"], 0) + 1
             d = self.con.execute("SELECT * FROM documents WHERE doc_id=?", (r["doc_id"],)).fetchone()
+            # đoạn gần trùng với kết quả đã chọn (nhiều phiên bản cùng nội dung) -> gộp, không tốn chỗ/token
+            sh = _shingles(r["text"])
+            dup = next((i for i, o in enumerate(shingles) if _jaccard(sh, o) >= 0.6), None)
+            if dup is not None:
+                where_ = f"{d['path']}/{d['name']}, {r['label']}"
+                if where_ not in hits[dup].similar:
+                    hits[dup].similar.append(where_)
+                continue
+            seen_content[r["content_id"]] = seen_content.get(r["content_id"], 0) + 1
+            shingles.append(sh)
             others = [f"{o['path']}/{o['name']}" for o in self.con.execute(
                 "SELECT path, name FROM documents WHERE content_id=? AND doc_id!=? AND status='indexed'",
                 (r["content_id"], d["doc_id"]))]
@@ -324,10 +335,19 @@ class Index:
                 "ocr_pages": tot[2], "duplicate_files": dup}
 
 
+def _shingles(text: str, n: int = 4) -> set:
+    w = re.findall(r"[0-9a-z]+", fold(text))
+    return {" ".join(w[i:i + n]) for i in range(max(1, len(w) - n + 1))}
+
+
+def _jaccard(a: set, b: set) -> float:
+    return len(a & b) / len(a | b) if a and b else 0.0
+
+
 def make_snippet(text: str, terms: list[str], width: int) -> str:
     """Cắt đoạn trích quanh vùng tập trung nhiều term nhất (vị trí tính trên bản fold, cùng độ dài)."""
     if len(text) <= width:
-        return text.replace("\n", " ⏎ ")
+        return text.replace("\n", " / ")
     f = fold(text)
     pos = [m.start() for t in set(terms) if len(t) > 1 for m in re.finditer(re.escape(t), f)]
     if not pos:
@@ -341,5 +361,5 @@ def make_snippet(text: str, terms: list[str], width: int) -> str:
                 best, start = n, p
         start = max(0, start - width // 4)
     end = min(len(text), start + width)
-    s = text[start:end].replace("\n", " ⏎ ")
+    s = text[start:end].replace("\n", " / ")
     return ("…" if start > 0 else "") + s + ("…" if end < len(text) else "")

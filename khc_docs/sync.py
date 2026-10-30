@@ -141,7 +141,7 @@ def sync_project(cfg: Config, prj: Project, *, limit: int | None = None, force: 
                 rep.ocr_pages += res.ocr_pages
                 if not chunks:
                     rep.empty += 1
-                warn = f"  ⚠ {len(res.warnings)} cảnh báo" if res.warnings else ""
+                warn = f"  (!) {len(res.warnings)} cảnh báo" if res.warnings else ""
                 progress(f"[xong] {rf.path}/{rf.name}: {len(chunks)} đoạn, {res.ocr_pages} trang OCR{warn}")
             idx.commit()
             if not cfg.keep_cache and isinstance(src, DriveSource):

@@ -68,7 +68,12 @@ def main(argv=None):
         for i, h in enumerate(idx.search(a.query, project=a.project and a.project.upper(), category=a.category,
                                          ext=a.type, limit=a.n), start=1):
             print(f"[S{i}] chunk {h.chunk_id} · {h.citation()}{' · OCR' if h.ocr else ''} · {h.tokens} tok")
-            print(f"     {h.snippet}\n")
+            print(f"     {h.snippet}")
+            for o in h.also_at[:3]:
+                print(f"     = bản sao: {o}")
+            for o in h.similar[:5]:
+                print(f"     ~ gần giống: {o}")
+            print()
     elif a.cmd == "show":
         c = Index(cfg.db).chunk(a.chunk_id)
         print(f"{c['path']}/{c['name']} — {c['label']}\n{'-' * 60}\n{c['text']}" if c else "Không tồn tại")

@@ -186,3 +186,18 @@ def test_xls_legacy(tmp_path):
     seg = extract(tmp_path / "ns.xls").segments[0]
     assert seg.label == "sheet 'NGÂN SÁCH'!A1:C2"
     assert "R2: NS.01 | Chi phí nhân công | 1,234,567.5" in seg.text
+
+
+def test_near_duplicates_collapsed(tmp_path):
+    from khc_docs.extract import ExtractResult, Segment
+
+    idx = Index(tmp_path / "t.db")
+    base = "Nhà cung cấp bê tông chờ quá giờ, đề nghị tính phụ thu đổ quá giờ; thời tiết mưa từ thứ 2 đến thứ 5"
+    for i, (name, text) in enumerate([("HOP/A.xlsx", base + " R21"), ("HOP/FINAL/A.pdf", base + " tr1"),
+                                      ("HOP/B.docx", "Đề xuất gia hạn tiến độ do mưa")]):
+        doc_id, _ = idx.upsert_document(project="T", source_id=f"x:{i}", name=name.split("/")[-1],
+                                        path="/".join(name.split("/")[:-1]), ext=".pdf", mime=None, size=1,
+                                        modified=None, hash_=f"h{i}", web_link=None)
+        idx.store_content(doc_id, f"h{i}", ExtractResult([]), [Segment(text, "tr.1")])
+    hits = idx.search("phụ thu đổ quá giờ")
+    assert len(hits) == 1 and len(hits[0].similar) == 1

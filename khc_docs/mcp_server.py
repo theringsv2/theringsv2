@@ -23,7 +23,8 @@ Cách dùng tiết kiệm token:
    Lọc theo category = thư mục cấp 1 (vd "03-HỢP ĐỒNG", "09-HỒ SƠ CHẤT LƯỢNG") nếu biết.
 2. Chỉ gọi read_chunk cho các kết quả thực sự liên quan; read_context khi cần đoạn trước/sau (vd bảng bị cắt).
 3. Khi trả lời: mỗi dữ kiện lấy từ hồ sơ phải kèm trích dẫn dạng [Tên file, vị trí] theo trường `cite`.
-   Không suy diễn ngoài nội dung đã đọc. Đoạn có ocr=true có thể sai chữ/số -> ghi rõ "(OCR, cần đối chiếu bản gốc)"
+   Không suy diễn ngoài nội dung đã đọc. Nếu kết quả có similar_versions (nhiều phiên bản gần giống), nêu rõ
+   phiên bản đang trích dẫn và ưu tiên bản FINAL/đã ký/đã gửi khi tên file thể hiện điều đó. Đoạn có ocr=true có thể sai chữ/số -> ghi rõ "(OCR, cần đối chiếu bản gốc)"
    khi dùng số liệu, ngày tháng, giá trị tiền từ đoạn đó.
 4. Không tìm thấy -> nói rõ là không thấy trong kho đã lập chỉ mục (kho có thể chưa đồng bộ file mới)."""
 
@@ -62,6 +63,8 @@ def search_docs(query: str, category: str | None = None, file_type: str | None =
             r["ocr"] = True
         if h.also_at:
             r["duplicate_copies"] = h.also_at[:3]
+        if h.similar:
+            r["similar_versions"] = h.similar[:5]   # nội dung gần giống ở file khác (nháp/FINAL/SUBMIT)
         out.append(r)
     return json.dumps({"results": out}, ensure_ascii=False)
 
