@@ -56,13 +56,29 @@ class ExtractOptions:
 
 # ---------------------------------------------------------------- OCR
 
+_WIN_TESSERACT = [
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+    str(Path.home() / "AppData" / "Local" / "Programs" / "Tesseract-OCR" / "tesseract.exe"),
+]
+
+
+def tesseract_cmd() -> str | None:
+    """Tìm tesseract trong PATH, rồi ở thư mục cài mặc định trên Windows (không bắt buộc sửa PATH)."""
+    found = shutil.which("tesseract")
+    if found:
+        return found
+    return next((p for p in _WIN_TESSERACT if Path(p).is_file()), None)
+
+
 def ocr_available() -> bool:
-    return shutil.which("tesseract") is not None
+    return tesseract_cmd() is not None
 
 
 def _ocr_image(img, lang: str) -> tuple[str, float]:
     import pytesseract
 
+    pytesseract.pytesseract.tesseract_cmd = tesseract_cmd() or "tesseract"
     data = pytesseract.image_to_data(img, lang=lang, output_type=pytesseract.Output.DICT,
                                      config="--psm 3")
     lines: dict[tuple, list[str]] = {}
