@@ -23,7 +23,8 @@ xlsx_rows_per_block = 40
 code = "NAMHA"
 name = "Nam Hà"
 drive_folder_id = "1gIygpVT9zbsBiLxOXB0XQO_B76Wq7acQ"   # thư mục NAM HÀ (01-HỒ SƠ THẦU … 18-NGÂN SÁCH)
-# local_path = "G:/My Drive/.../NAM HÀ"                 # dùng thay Drive API nếu đã đồng bộ Drive for Desktop
+# local_path = 'G:\My Drive\...\NAM HÀ'                 # dùng thay Drive API nếu có Drive for Desktop.
+#                                                       # Đường dẫn Windows: dùng NGOẶC ĐƠN '...' (hoặc "G:/.../NAM HÀ")
 exclude_paths = ["11-HÌNH ẢNH THI CÔNG"]                # ảnh hiện trường: OCR không có giá trị tra cứu
 max_file_mb = 200
 ocr_images = true

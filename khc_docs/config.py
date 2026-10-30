@@ -49,7 +49,13 @@ def load(path: str | None = None) -> Config:
     p = Path(path or os.environ.get("KHC_DOCS_CONFIG", "khc_docs.toml")).expanduser().resolve()
     if not p.exists():
         raise SystemExit(f"Không thấy file cấu hình {p}. Sao chép khc_docs.example.toml -> khc_docs.toml")
-    raw = tomllib.loads(p.read_text(encoding="utf-8"))
+    try:
+        raw = tomllib.loads(p.read_text(encoding="utf-8-sig"))
+    except tomllib.TOMLDecodeError as e:
+        raise SystemExit(
+            f"Lỗi cú pháp trong {p}: {e}\n"
+            "Gợi ý: đường dẫn Windows phải đặt trong ngoặc đơn 'G:\\My Drive\\...' "
+            "hoặc dùng dấu / trong ngoặc kép \"G:/My Drive/...\"") from None
     base = p.parent
 
     def rel(v: str) -> Path:
