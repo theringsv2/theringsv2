@@ -20,6 +20,8 @@ def main(argv=None):
     s.add_argument("--limit", type=int, help="chỉ xử lý N file mới (chạy thử)")
     s.add_argument("--force", action="store_true", help="trích xuất lại kể cả file không đổi")
     s.add_argument("--dry-run", action="store_true", help="chỉ liệt kê, không tải/ghi")
+    s.add_argument("--path", help="chỉ xử lý file có đường dẫn/tên chứa chuỗi này (không phân biệt dấu), "
+                                   "vd \"IPC-02/HSCL\"; không gỡ file ngoài phạm vi")
 
     q = sub.add_parser("search", help="tìm thử từ dòng lệnh")
     q.add_argument("query")
@@ -61,7 +63,7 @@ def main(argv=None):
     elif a.cmd == "sync":
         from .sync import sync_project
         prj = cfg.project(a.project)
-        rep = sync_project(cfg, prj, limit=a.limit, force=a.force, dry_run=a.dry_run)
+        rep = sync_project(cfg, prj, limit=a.limit, force=a.force, dry_run=a.dry_run, path_filter=a.path)
         print(json.dumps(rep.__dict__, ensure_ascii=False, indent=2))
     elif a.cmd == "search":
         idx = Index(cfg.db)

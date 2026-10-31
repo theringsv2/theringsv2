@@ -201,3 +201,19 @@ def test_near_duplicates_collapsed(tmp_path):
         idx.store_content(doc_id, f"h{i}", ExtractResult([]), [Segment(text, "tr.1")])
     hits = idx.search("phụ thu đổ quá giờ")
     assert len(hits) == 1 and len(hits[0].similar) == 1
+
+
+def test_sync_path_filter(project):
+    cfg = project
+    prj = cfg.project("TEST")
+    sync_project(cfg, prj, progress=lambda *_: None)
+    # --force chỉ trong phạm vi: gõ không dấu, dấu \ kiểu Windows
+    rep = sync_project(cfg, prj, force=True, path_filter="03-hop dong\\", progress=lambda *_: None)
+    assert rep.seen == 2 and rep.extracted == 2 and rep.removed == 0
+    # file ngoài phạm vi bị xoá trên nguồn: lần chạy theo --path không gỡ nó
+    (Path(prj.local_path) / "04-TIẾN ĐỘ - KẾ HOẠCH" / "BC.pptx").unlink()
+    rep = sync_project(cfg, prj, path_filter="03-HỢP ĐỒNG", progress=lambda *_: None)
+    assert rep.removed == 0
+    assert any(h.name == "BC.pptx" for h in Index(cfg.db).search("chậm cấp thép"))
+    # lần chạy đầy đủ mới gỡ
+    assert sync_project(cfg, prj, progress=lambda *_: None).removed == 1

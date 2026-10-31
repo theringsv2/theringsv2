@@ -14,7 +14,7 @@ from .config import Config, Project
 from .extract import IMAGE_EXT, SUPPORTED, ExtractOptions, extract
 from .index import Index
 from .sources import DriveSource, LocalSource, RemoteFile
-from .textutil import nfc
+from .textutil import fold, nfc
 
 log = logging.getLogger(__name__)
 
@@ -64,8 +64,16 @@ def make_source(cfg: Config, prj: Project):
     return DriveSource(prj.drive_folder_id, str(cfg.credentials), str(cfg.token))
 
 
+def path_matcher(path_filter: str | None):
+    """So khớp một phần đường dẫn/tên file, không phân biệt hoa thường, dấu và kiểu gạch chéo."""
+    if not path_filter:
+        return None
+    needle = fold(nfc(path_filter.replace("\\", "/"))).strip("/ ")
+    return lambda rf: needle in fold(nfc(f"{rf.path}/{rf.name}"))
+
+
 def sync_project(cfg: Config, prj: Project, *, limit: int | None = None, force: bool = False,
-                 dry_run: bool = False, progress=print) -> SyncReport:
+                 dry_run: bool = False, path_filter: str | None = None, progress=print) -> SyncReport:
     t0 = time.time()
     rep = SyncReport()
     idx = Index(cfg.db)
@@ -74,7 +82,10 @@ def sync_project(cfg: Config, prj: Project, *, limit: int | None = None, force: 
     jobs: dict[str, list[tuple[int, RemoteFile]]] = {}   # content_hash -> các document cùng nội dung
     walk_complete = False
     try:
+        in_scope = path_matcher(path_filter)
         for rf in src.walk():
+            if in_scope and not in_scope(rf):
+                continue      # ngoài phạm vi --path: không đụng tới, giữ nguyên trạng thái cũ
             rep.seen += 1
             reason = _skip_reason(rf, prj)
             if dry_run:
@@ -157,7 +168,7 @@ def sync_project(cfg: Config, prj: Project, *, limit: int | None = None, force: 
             for h, p, d in ready:
                 store(h, p, d, _work(str(p), cfg.extract))
 
-        if walk_complete and not limit:
+        if walk_complete and not limit and not path_filter:
             rep.removed = idx.mark_removed(prj.code, t0)
         idx.commit()
     except Exception:

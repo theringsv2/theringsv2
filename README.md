@@ -70,6 +70,8 @@ cp khc_docs.example.toml khc_docs.toml       # đã điền sẵn folder NAM HÀ
 khc-docs sync --dry-run                       # xem file nào sẽ xử lý / bỏ qua, chưa tải
 khc-docs sync --limit 30                      # chạy thử 30 file
 khc-docs sync                                 # toàn bộ; chạy lại chỉ xử lý file mới/đổi
+khc-docs sync --path "IPC-02/HSCL"            # chỉ thư mục/file có đường dẫn chứa chuỗi này (không phân biệt dấu)
+khc-docs sync --path "KCS DOT 01" --force     # trích xuất lại riêng phạm vi đó, không đụng phần còn lại
 khc-docs stats
 khc-docs errors --status error                # file lỗi; --status empty: file không ra chữ
 khc-docs search "tạm ứng bảo lãnh" --category 03
