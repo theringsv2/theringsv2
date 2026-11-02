@@ -44,6 +44,13 @@ def main(argv=None):
     sub.add_parser("serve", help="chạy MCP server (stdio)")
 
     a = ap.parse_args(argv)
+    if a.cmd != "serve":
+        # Windows: khi chuyển hướng/pipe (| Tee-Object, > file) Python mặc định dùng cp1252 -> lỗi chữ tiếng Việt
+        for stream in (sys.stdout, sys.stderr):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (AttributeError, ValueError):
+                pass
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s", stream=sys.stderr)
     if a.config:
         import os
