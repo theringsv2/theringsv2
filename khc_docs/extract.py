@@ -18,7 +18,7 @@ from .textutil import clean
 log = logging.getLogger(__name__)
 
 SUPPORTED = {
-    ".pdf", ".docx", ".xlsx", ".xlsm", ".pptx",
+    ".pdf", ".docx", ".xlsx", ".xlsm", ".xlsb", ".pptx",
     ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp",
     ".txt", ".csv", ".md",
     # định dạng cũ: chuyển qua LibreOffice nếu máy có cài
@@ -314,6 +314,34 @@ def _extract_xls(path: Path, opt: ExtractOptions) -> ExtractResult:
     return res
 
 
+def _extract_xlsb(path: Path, opt: ExtractOptions) -> ExtractResult:
+    """Excel nhị phân (.xlsb) qua pyxlsb. Ngày tháng trong .xlsb lưu dạng số serial, giữ nguyên số."""
+    from pyxlsb import open_workbook
+
+    res = ExtractResult(segments=[])
+    with open_workbook(str(path)) as wb:
+        for name in wb.sheets:
+            with wb.get_sheet(name) as sh:
+                def rows(sh=sh):
+                    expect = 0
+                    for row in sh.rows(sparse=True):
+                        if not row:
+                            continue
+                        r = row[0].r
+                        while expect < r:          # giữ đúng số dòng Excel cho nhãn vùng ô
+                            yield []
+                            expect += 1
+                        width = max(c.c for c in row) + 1
+                        vals = [None] * width
+                        for c in row:
+                            vals[c.c] = c.v
+                        yield vals
+                        expect = r + 1
+                _sheet_segments(name, rows(), opt, res)
+    res.warnings.append("xlsb: ngày tháng hiển thị dạng số serial Excel")
+    return res
+
+
 # ---------------------------------------------------------------- PPTX
 
 def _extract_pptx(path: Path, opt: ExtractOptions) -> ExtractResult:
@@ -389,7 +417,7 @@ _HANDLERS = {
     ".xlsx": _extract_xlsx, ".xlsm": _extract_xlsx,
     ".pptx": _extract_pptx,
     ".txt": _extract_text, ".csv": _extract_text, ".md": _extract_text,
-    ".xls": _extract_xls,
+    ".xls": _extract_xls, ".xlsb": _extract_xlsb,
     ".doc": _convert_legacy, ".ppt": _convert_legacy,
     **{e: _extract_image for e in IMAGE_EXT},
 }
