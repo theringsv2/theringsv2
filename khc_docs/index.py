@@ -320,6 +320,14 @@ class Index:
             f" WHERE {' AND '.join(where)} ORDER BY d.path, d.name LIMIT ? OFFSET ?",
             args + [limit, offset]).fetchall()
 
+    def peek(self, source_id: str) -> sqlite3.Row | None:
+        return self.con.execute("SELECT hash, status FROM documents WHERE source_id=?", (source_id,)).fetchone()
+
+    def last_sync(self, project: str | None = None) -> str | None:
+        w, a = ("WHERE project=?", [project]) if project else ("", [])
+        t = self.con.execute(f"SELECT MAX(seen_at) FROM documents {w}", a).fetchone()[0]
+        return time.strftime("%d/%m/%Y %H:%M", time.localtime(t)) if t else None
+
     def stats(self, project: str | None = None) -> dict:
         w, a = ("WHERE project=?", [project]) if project else ("", [])
         by_status = dict(self.con.execute(f"SELECT status, COUNT(*) FROM documents {w} GROUP BY status", a).fetchall())
@@ -330,7 +338,7 @@ class Index:
         dup = self.con.execute(
             f"SELECT COUNT(*) - COUNT(DISTINCT content_id) FROM documents {w} {'AND' if w else 'WHERE'}"
             f" content_id IS NOT NULL", a).fetchone()[0]
-        return {"documents_by_status": by_status, "indexed_by_category": by_cat,
+        return {"last_sync": self.last_sync(project), "documents_by_status": by_status, "indexed_by_category": by_cat,
                 "unique_contents": tot[0], "total_chars": tot[1], "est_tokens_all": int(tot[1] / 2.5),
                 "ocr_pages": tot[2], "duplicate_files": dup}
 

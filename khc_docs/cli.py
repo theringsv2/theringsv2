@@ -23,6 +23,10 @@ def main(argv=None):
     s.add_argument("--path", help="chỉ xử lý file có đường dẫn/tên chứa chuỗi này (không phân biệt dấu), "
                                    "vd \"IPC-02/HSCL\"; không gỡ file ngoài phạm vi")
 
+    ck = sub.add_parser("status", help="kiểm tra kho đã cập nhật chưa: liệt kê file MỚI/ĐÃ ĐỔI chưa sync (không ghi gì)")
+    ck.add_argument("-p", "--project")
+    ck.add_argument("--path", help="chỉ kiểm tra trong phạm vi đường dẫn này")
+
     q = sub.add_parser("search", help="tìm thử từ dòng lệnh")
     q.add_argument("query")
     q.add_argument("-p", "--project")
@@ -72,6 +76,15 @@ def main(argv=None):
         prj = cfg.project(a.project)
         rep = sync_project(cfg, prj, limit=a.limit, force=a.force, dry_run=a.dry_run, path_filter=a.path)
         print(json.dumps(rep.__dict__, ensure_ascii=False, indent=2))
+    elif a.cmd == "status":
+        from .sync import sync_project
+        prj = cfg.project(a.project)
+        rep = sync_project(cfg, prj, dry_run=True, path_filter=a.path)
+        print(f"\nDự án {prj.code} – lần sync gần nhất: {rep.last_sync or 'chưa sync'}")
+        print(f"File trên nguồn: {rep.seen} | không đổi: {rep.unchanged} | bị bỏ qua: {rep.skipped}"
+              f" | CHỜ SYNC (mới/đã đổi): {rep.to_update}")
+        print("=> ĐÃ CẬP NHẬT MỚI NHẤT" if rep.to_update == 0
+              else f"=> CHƯA CẬP NHẬT: chạy  khc-docs sync -p {prj.code}")
     elif a.cmd == "search":
         idx = Index(cfg.db)
         for i, h in enumerate(idx.search(a.query, project=a.project and a.project.upper(), category=a.category,

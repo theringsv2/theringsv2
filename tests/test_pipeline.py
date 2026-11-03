@@ -217,3 +217,21 @@ def test_sync_path_filter(project):
     assert any(h.name == "BC.pptx" for h in Index(cfg.db).search("chậm cấp thép"))
     # lần chạy đầy đủ mới gỡ
     assert sync_project(cfg, prj, progress=lambda *_: None).removed == 1
+
+
+def test_dry_run_detects_new_and_changed(project):
+    import os
+    cfg = project
+    prj = cfg.project("TEST")
+    sync_project(cfg, prj, progress=lambda *_: None)
+    rep = sync_project(cfg, prj, dry_run=True, progress=lambda *_: None)
+    assert rep.to_update == 0 and rep.last_sync
+    root = Path(prj.local_path)
+    (root / "03-HỢP ĐỒNG" / "moi.txt").write_text("Phụ lục hợp đồng số 2", encoding="utf-8")
+    f = root / "04-TIẾN ĐỘ - KẾ HOẠCH" / "BC.pptx"
+    os.utime(f, (f.stat().st_atime, f.stat().st_mtime + 100))
+    lines = []
+    rep = sync_project(cfg, prj, dry_run=True, progress=lines.append)
+    assert rep.to_update == 2
+    assert any(l.startswith("MỚI") and "moi.txt" in l for l in lines)
+    assert any(l.startswith("ĐỔI") and "BC.pptx" in l for l in lines)

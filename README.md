@@ -72,6 +72,7 @@ khc-docs sync --limit 30                      # chạy thử 30 file
 khc-docs sync                                 # toàn bộ; chạy lại chỉ xử lý file mới/đổi
 khc-docs sync --path "IPC-02/HSCL"            # chỉ thư mục/file có đường dẫn chứa chuỗi này (không phân biệt dấu)
 khc-docs sync --path "KCS DOT 01" --force     # trích xuất lại riêng phạm vi đó, không đụng phần còn lại
+khc-docs status -p NAMHA                      # đã cập nhật mới nhất chưa? liệt kê file MỚI/ĐỔI chưa sync
 khc-docs stats
 khc-docs errors --status error                # file lỗi; --status empty: file không ra chữ
 khc-docs search "tạm ứng bảo lãnh" --category 03

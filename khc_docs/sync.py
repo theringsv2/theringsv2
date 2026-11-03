@@ -30,6 +30,8 @@ class SyncReport:
     errors: list[str] = field(default_factory=list)
     removed: int = 0
     ocr_pages: int = 0
+    to_update: int = 0      # chỉ khi --dry-run: số file mới/đã đổi đang chờ sync
+    last_sync: str | None = None
     seconds: float = 0.0
 
 
@@ -89,8 +91,20 @@ def sync_project(cfg: Config, prj: Project, *, limit: int | None = None, force: 
             rep.seen += 1
             reason = _skip_reason(rf, prj)
             if dry_run:
-                progress(f"{'SKIP' if reason else 'OK  '} {rf.path}/{rf.name}" + (f"  ({reason})" if reason else ""))
-                rep.skipped += bool(reason)
+                # so với kho: chỉ in file MỚI / ĐÃ ĐỔI / bỏ qua lần đầu, file không đổi chỉ đếm
+                prev = idx.peek(rf.source_id)
+                if reason:
+                    rep.skipped += 1
+                    if prev is None:
+                        progress(f"SKIP {rf.path}/{rf.name}  ({reason})")
+                elif prev is None:
+                    rep.to_update += 1
+                    progress(f"MỚI  {rf.path}/{rf.name}")
+                elif prev["hash"] != rf.hash or prev["status"] in ("pending", "error", "removed"):
+                    rep.to_update += 1
+                    progress(f"ĐỔI  {rf.path}/{rf.name}")
+                else:
+                    rep.unchanged += 1
                 continue
             doc_id, changed = idx.upsert_document(
                 project=prj.code, source_id=rf.source_id, name=rf.name, path=rf.path, ext=rf.ext, mime=rf.mime,
@@ -118,6 +132,7 @@ def sync_project(cfg: Config, prj: Project, *, limit: int | None = None, force: 
             walk_complete = True
         idx.commit()
         if dry_run:
+            rep.last_sync = idx.last_sync(prj.code)
             return rep
 
         # 1) tải về (tuần tự, Drive API có rate limit)
